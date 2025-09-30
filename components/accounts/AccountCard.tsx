@@ -5,8 +5,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Copy, Check } from 'lucide-react';
-import { Account, maskAccountNumber, formatCurrency } from '@/lib/mockData';
+import { maskAccountNumber, formatCurrency } from '@/lib/mockData';
+import { Database } from '@/lib/supabase/types';
 import { toast } from 'sonner';
+
+type Account = Database['public']['Tables']['accounts']['Row'];
 
 interface AccountCardProps {
   account: Account;
@@ -31,37 +34,37 @@ export default function AccountCard({ account }: AccountCardProps) {
       <CardContent className="p-6">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h3 className="text-xl font-bold mb-1">{account.bankName}</h3>
+            <h3 className="text-xl font-bold mb-1">{account.bank_name}</h3>
             <p className="text-sm text-muted-foreground">{account.branch}</p>
           </div>
-          <Badge variant={account.accountType === 'savings' ? 'default' : 'secondary'}>
-            {account.accountType === 'savings' ? 'Savings' : 'Current'}
+          <Badge variant={account.account_type === 'savings' ? 'default' : 'secondary'}>
+            {account.account_type === 'savings' ? 'Savings' : 'Current'}
           </Badge>
         </div>
 
         <div className="space-y-4">
           <div className="bg-accent/30 rounded-lg p-4">
             <p className="text-sm text-muted-foreground mb-1">Balance</p>
-            <p className="text-2xl font-bold">{formatCurrency(account.balance)}</p>
+            <p className="text-2xl font-bold">{formatCurrency(Number(account.balance))}</p>
           </div>
 
           <div className="space-y-3">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Account Number</p>
               <p className="font-mono text-sm font-medium">
-                {maskAccountNumber(account.accountNumber)}
+                {maskAccountNumber(account.account_number)}
               </p>
             </div>
 
             <div className="flex items-center justify-between bg-accent/20 rounded-lg p-3">
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground mb-1">IFSC Code</p>
-                <p className="font-mono text-sm font-medium">{account.ifscCode}</p>
+                <p className="font-mono text-sm font-medium">{account.ifsc_code}</p>
               </div>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => copyToClipboard(account.ifscCode, 'IFSC Code')}
+                onClick={() => copyToClipboard(account.ifsc_code, 'IFSC Code')}
                 className="ml-2"
               >
                 {copiedField === 'IFSC Code' ? (
@@ -75,12 +78,12 @@ export default function AccountCard({ account }: AccountCardProps) {
             <div className="flex items-center justify-between bg-accent/20 rounded-lg p-3">
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground mb-1">UPI ID</p>
-                <p className="font-mono text-sm font-medium">{account.upiId}</p>
+                <p className="font-mono text-sm font-medium">{account.upi_id}</p>
               </div>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => copyToClipboard(account.upiId, 'UPI ID')}
+                onClick={() => copyToClipboard(account.upi_id, 'UPI ID')}
                 className="ml-2"
               >
                 {copiedField === 'UPI ID' ? (

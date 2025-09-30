@@ -1,13 +1,34 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import AccountCard from '@/components/accounts/AccountCard';
 import AddAccountModal from '@/components/accounts/AddAccountModal';
-import { mockAccounts, formatCurrency } from '@/lib/mockData';
-import { Wallet } from 'lucide-react';
+import { formatCurrency } from '@/lib/mockData';
+import { getAccounts } from '@/lib/api/accounts';
+import { Database } from '@/lib/supabase/types';
+import { Wallet, Loader as Loader2 } from 'lucide-react';
+
+type Account = Database['public']['Tables']['accounts']['Row'];
 
 export default function AccountsPage() {
-  const totalBalance = mockAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const loadAccounts = async () => {
+    setLoading(true);
+    const { data, error } = await getAccounts();
+    if (data) {
+      setAccounts(data);
+    }
+    setLoading(false);
+  };
+
+  const totalBalance = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
 
   return (
     <DashboardLayout>
@@ -19,7 +40,7 @@ export default function AccountsPage() {
               Manage your bank accounts and UPI IDs
             </p>
           </div>
-          <AddAccountModal />
+          <AddAccountModal onAccountAdded={loadAccounts} />
         </div>
 
         <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-border rounded-lg p-6">
@@ -31,17 +52,27 @@ export default function AccountsPage() {
               <p className="text-sm text-muted-foreground">Total Balance</p>
               <p className="text-3xl font-bold">{formatCurrency(totalBalance)}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Across {mockAccounts.length} accounts
+                Across {accounts.length} accounts
               </p>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {mockAccounts.map((account) => (
-            <AccountCard key={account.id} account={account} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : accounts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No accounts yet. Add your first account to get started!</p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {accounts.map((account) => (
+              <AccountCard key={account.id} account={account} />
+            ))}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

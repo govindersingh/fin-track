@@ -7,14 +7,63 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Wallet } from 'lucide-react';
+import { signIn, signUp } from '@/lib/supabase/auth';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/dashboard');
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await signIn(email, password);
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      if (data.user) {
+        toast.success('Logged in successfully!');
+        router.push('/dashboard');
+      }
+    } catch (err) {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await signUp(email, password, fullName);
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      if (data.user) {
+        toast.success('Account created! Please sign in.');
+        setIsSignUp(false);
+        setPassword('');
+        setFullName('');
+      }
+    } catch (err) {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -32,13 +81,31 @@ export default function LoginPage() {
 
         <Card className="border-2">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl">Welcome back</CardTitle>
+            <CardTitle className="text-2xl">
+              {isSignUp ? 'Create an account' : 'Welcome back'}
+            </CardTitle>
             <CardDescription>
-              Enter your email to access your account
+              {isSignUp
+                ? 'Enter your details to create your account'
+                : 'Enter your credentials to access your account'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
+              {isSignUp && (
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Rajesh Kumar"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="h-11"
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -51,25 +118,44 @@ export default function LoginPage() {
                   className="h-11"
                 />
               </div>
-              <Button type="submit" className="w-full h-11" size="lg">
-                Login
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="h-11"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full h-11"
+                size="lg"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Login'}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                Don't have an account?{' '}
-                <button className="text-primary hover:underline font-medium">
-                  Sign up
+                {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setPassword('');
+                    setFullName('');
+                  }}
+                  className="text-primary hover:underline font-medium"
+                >
+                  {isSignUp ? 'Sign in' : 'Sign up'}
                 </button>
               </p>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-border">
-              <div className="text-xs text-center text-muted-foreground">
-                <p>Demo app - No actual authentication required</p>
-                <p className="mt-1">Simply enter any email and click Login</p>
-              </div>
             </div>
           </CardContent>
         </Card>
