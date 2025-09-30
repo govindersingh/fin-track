@@ -21,9 +21,15 @@ import {
 } from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { createAccount } from '@/lib/api/accounts';
 
-export default function AddAccountModal() {
+interface AddAccountModalProps {
+  onAccountAdded?: () => void;
+}
+
+export default function AddAccountModal({ onAccountAdded }: AddAccountModalProps) {
   const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     bankName: '',
     branch: '',
@@ -34,19 +40,46 @@ export default function AddAccountModal() {
     accountType: 'savings' as 'savings' | 'current',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Account added successfully');
-    setOpen(false);
-    setFormData({
-      bankName: '',
-      branch: '',
-      accountNumber: '',
-      ifscCode: '',
-      upiId: '',
-      balance: '',
-      accountType: 'savings',
-    });
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await createAccount({
+        bank_name: formData.bankName,
+        branch: formData.branch,
+        account_number: formData.accountNumber,
+        ifsc_code: formData.ifscCode,
+        upi_id: formData.upiId,
+        balance: Number(formData.balance),
+        account_type: formData.accountType,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.success('Account added successfully');
+      setOpen(false);
+      setFormData({
+        bankName: '',
+        branch: '',
+        accountNumber: '',
+        ifscCode: '',
+        upiId: '',
+        balance: '',
+        accountType: 'savings',
+      });
+
+      if (onAccountAdded) {
+        onAccountAdded();
+      }
+    } catch (err) {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -158,10 +191,12 @@ export default function AddAccountModal() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit">Add Account</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Adding...' : 'Add Account'}
+            </Button>
           </div>
         </form>
       </DialogContent>
