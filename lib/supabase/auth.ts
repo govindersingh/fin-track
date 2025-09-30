@@ -1,30 +1,17 @@
 import { supabase } from './client';
 
 export async function signUp(email: string, password: string, fullName: string) {
-  const { data: authData, error: authError } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      data: {
+        full_name: fullName,
+      },
+    },
   });
 
-  if (authError) {
-    return { data: null, error: authError };
-  }
-
-  if (authData.user) {
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert({
-        id: authData.user.id,
-        full_name: fullName,
-        plan: 'free',
-      });
-
-    if (profileError) {
-      return { data: null, error: profileError };
-    }
-  }
-
-  return { data: authData, error: null };
+  return { data, error };
 }
 
 export async function signIn(email: string, password: string) {
