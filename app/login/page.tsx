@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Wallet } from 'lucide-react';
-import { signIn, signUp } from '@/lib/supabase/auth';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
@@ -23,17 +23,19 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { data, error } = await signIn(email, password);
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
 
-      if (error) {
-        toast.error(error.message);
+      if (result?.error) {
+        toast.error('Invalid credentials');
         return;
       }
 
-      if (data.user) {
-        toast.success('Logged in successfully!');
-        router.push('/dashboard');
-      }
+      toast.success('Logged in successfully!');
+      router.push('/dashboard');
     } catch (err) {
       toast.error('An unexpected error occurred');
     } finally {
@@ -46,19 +48,23 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { data, error } = await signUp(email, password, fullName);
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, fullName }),
+      });
 
-      if (error) {
-        toast.error(error.message);
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.message || 'Failed to create account');
         return;
       }
 
-      if (data.user) {
-        toast.success('Account created! Please sign in.');
-        setIsSignUp(false);
-        setPassword('');
-        setFullName('');
-      }
+      toast.success('Account created! Please sign in.');
+      setIsSignUp(false);
+      setPassword('');
+      setFullName('');
     } catch (err) {
       toast.error('An unexpected error occurred');
     } finally {

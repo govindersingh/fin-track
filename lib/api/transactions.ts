@@ -1,168 +1,186 @@
-import { supabase } from '@/lib/supabase/client';
-import { Database } from '@/lib/supabase/types';
+import { prisma } from '@/lib/prisma';
 
-type Transaction = Database['public']['Tables']['transactions']['Row'];
-type TransactionInsert = Database['public']['Tables']['transactions']['Insert'];
-type TransactionUpdate = Database['public']['Tables']['transactions']['Update'];
-
-export async function getTransactions(limit?: number) {
-  let query = supabase
-    .from('transactions')
-    .select('*')
-    .order('date', { ascending: false });
-
-  if (limit) {
-    query = query.limit(limit);
+export async function getTransactions(userId: string, limit?: number) {
+  try {
+    const transactions = await prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+      take: limit,
+    });
+    return { data: transactions, error: null };
+  } catch (error) {
+    return { data: null, error };
   }
-
-  const { data, error } = await query;
-  return { data, error };
 }
 
-export async function getTransactionById(id: string) {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-
-  return { data, error };
-}
-
-export async function createTransaction(transaction: Omit<TransactionInsert, 'user_id'>) {
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: new Error('User not authenticated') };
+export async function getTransactionById(id: string, userId: string) {
+  try {
+    const transaction = await prisma.transaction.findFirst({
+      where: { id, userId },
+    });
+    return { data: transaction, error: null };
+  } catch (error) {
+    return { data: null, error };
   }
-
-  const { data, error } = await supabase
-    .from('transactions')
-    .insert({
-      ...transaction,
-      user_id: user.id,
-    })
-    .select()
-    .single();
-
-  return { data, error };
 }
 
-export async function updateTransaction(id: string, updates: TransactionUpdate) {
-  const { data, error } = await supabase
-    .from('transactions')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  return { data, error };
+export async function createTransaction(
+  userId: string,
+  transaction: {
+    accountId: string;
+    date: Date;
+    description: string;
+    amount: number;
+    type: string;
+    category: string;
+  }
+) {
+  try {
+    const newTransaction = await prisma.transaction.create({
+      data: {
+        userId,
+        accountId: transaction.accountId,
+        date: transaction.date,
+        description: transaction.description,
+        amount: transaction.amount,
+        type: transaction.type,
+        category: transaction.category,
+      },
+    });
+    return { data: newTransaction, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
 }
 
-export async function deleteTransaction(id: string) {
-  const { error } = await supabase
-    .from('transactions')
-    .delete()
-    .eq('id', id);
-
-  return { error };
+export async function updateTransaction(
+  id: string,
+  userId: string,
+  updates: {
+    accountId?: string;
+    date?: Date;
+    description?: string;
+    amount?: number;
+    type?: string;
+    category?: string;
+  }
+) {
+  try {
+    const transaction = await prisma.transaction.updateMany({
+      where: { id, userId },
+      data: updates,
+    });
+    return { data: transaction, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
 }
 
-export async function getTotalIncome() {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('amount')
-    .eq('type', 'credit');
+export async function deleteTransaction(id: string, userId: string) {
+  try {
+    await prisma.transaction.deleteMany({
+      where: { id, userId },
+    });
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
+}
 
-  if (error || !data) {
+export async function getTotalIncome(userId: string) {
+  try {
+    const result = await prisma.transaction.aggregate({
+      where: { userId, type: 'credit' },
+      _sum: {
+        amount: true,
+      },
+    });
+    return { total: Number(result._sum.amount || 0), error: null };
+  } catch (error) {
     return { total: 0, error };
   }
-
-  const total = data.reduce((sum, txn) => sum + Number(txn.amount), 0);
-  return { total, error: null };
 }
 
-export async function getTotalExpense() {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('amount')
-    .eq('type', 'debit');
-
-  if (error || !data) {
+export async function getTotalExpense(userId: string) {
+  try {
+    const result = await prisma.transaction.aggregate({
+      where: { userId, type: 'debit' },
+      _sum: {
+        amount: true,
+      },
+    });
+    return { total: Number(result._sum.amount || 0), error: null };
+  } catch (error) {
     return { total: 0, error };
   }
-
-  const total = data.reduce((sum, txn) => sum + Number(txn.amount), 0);
-  return { total, error: null };
 }
 
-export async function getMonthlyData() {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .order('date', { ascending: true });
-
-  if (error || !data) {
-    return { data: [], error };
-  }
-
-  const monthlyMap = new Map<string, { income: number; expense: number }>();
-
-  data.forEach((txn) => {
-    const date = new Date(txn.date);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-
-    if (!monthlyMap.has(monthKey)) {
-      monthlyMap.set(monthKey, { income: 0, expense: 0 });
-    }
-
-    const monthData = monthlyMap.get(monthKey)!;
-    if (txn.type === 'credit') {
-      monthData.income += Number(txn.amount);
-    } else {
-      monthData.expense += Number(txn.amount);
-    }
-  });
-
-  const monthlyData = Array.from(monthlyMap.entries())
-    .slice(-6)
-    .map(([key, values]) => {
-      const [year, month] = key.split('-');
-      const date = new Date(Number(year), Number(month) - 1);
-      return {
-        month: date.toLocaleDateString('en-US', { month: 'short' }),
-        income: values.income,
-        expense: values.expense,
-      };
+export async function getMonthlyData(userId: string) {
+  try {
+    const transactions = await prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { date: 'asc' },
     });
 
-  return { data: monthlyData, error: null };
-}
+    const monthlyMap = new Map<string, { income: number; expense: number }>();
 
-export async function getCategoryExpenses() {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('category, amount')
-    .eq('type', 'debit');
+    transactions.forEach((txn) => {
+      const date = new Date(txn.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
-  if (error || !data) {
+      if (!monthlyMap.has(monthKey)) {
+        monthlyMap.set(monthKey, { income: 0, expense: 0 });
+      }
+
+      const monthData = monthlyMap.get(monthKey)!;
+      if (txn.type === 'credit') {
+        monthData.income += Number(txn.amount);
+      } else {
+        monthData.expense += Number(txn.amount);
+      }
+    });
+
+    const monthlyData = Array.from(monthlyMap.entries())
+      .slice(-6)
+      .map(([key, values]) => {
+        const [year, month] = key.split('-');
+        const date = new Date(Number(year), Number(month) - 1);
+        return {
+          month: date.toLocaleDateString('en-US', { month: 'short' }),
+          income: values.income,
+          expense: values.expense,
+        };
+      });
+
+    return { data: monthlyData, error: null };
+  } catch (error) {
     return { data: [], error };
   }
+}
 
-  const categoryMap = new Map<string, number>();
+export async function getCategoryExpenses(userId: string) {
+  try {
+    const transactions = await prisma.transaction.findMany({
+      where: { userId, type: 'debit' },
+      select: { category: true, amount: true },
+    });
 
-  data.forEach((txn) => {
-    const current = categoryMap.get(txn.category) || 0;
-    categoryMap.set(txn.category, current + Number(txn.amount));
-  });
+    const categoryMap = new Map<string, number>();
 
-  const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444'];
-  const categoryData = Array.from(categoryMap.entries()).map(([category, amount], index) => ({
-    category,
-    amount,
-    color: colors[index % colors.length],
-  }));
+    transactions.forEach((txn) => {
+      const current = categoryMap.get(txn.category) || 0;
+      categoryMap.set(txn.category, current + Number(txn.amount));
+    });
 
-  return { data: categoryData, error: null };
+    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444'];
+    const categoryData = Array.from(categoryMap.entries()).map(([category, amount], index) => ({
+      category,
+      amount,
+      color: colors[index % colors.length],
+    }));
+
+    return { data: categoryData, error: null };
+  } catch (error) {
+    return { data: [], error };
+  }
 }

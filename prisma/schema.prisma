@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  fullName      String    @map("full_name")
+  avatarUrl     String?   @map("avatar_url")
+  plan          String    @default("free")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts      Account[]
+  transactions  Transaction[]
+
+  @@map("users")
+}
+
+model Account {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  bankName      String   @map("bank_name")
+  branch        String
+  accountNumber String   @map("account_number")
+  ifscCode      String   @map("ifsc_code")
+  upiId         String   @map("upi_id")
+  balance       Decimal  @default(0) @db.Decimal(10, 2)
+  accountType   String   @map("account_type")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  Transaction[]
+
+  @@map("accounts")
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  accountId   String   @map("account_id")
+  date        DateTime
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  type        String
+  category    String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}

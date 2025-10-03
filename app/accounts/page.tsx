@@ -5,11 +5,21 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import AccountCard from '@/components/accounts/AccountCard';
 import AddAccountModal from '@/components/accounts/AddAccountModal';
 import { formatCurrency } from '@/lib/mockData';
-import { getAccounts } from '@/lib/api/accounts';
-import { Database } from '@/lib/supabase/types';
 import { Wallet, Loader as Loader2 } from 'lucide-react';
 
-type Account = Database['public']['Tables']['accounts']['Row'];
+interface Account {
+  id: string;
+  userId: string;
+  bankName: string;
+  branch: string;
+  accountNumber: string;
+  ifscCode: string;
+  upiId: string;
+  balance: number;
+  accountType: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -21,9 +31,14 @@ export default function AccountsPage() {
 
   const loadAccounts = async () => {
     setLoading(true);
-    const { data, error } = await getAccounts();
-    if (data) {
-      setAccounts(data);
+    try {
+      const response = await fetch('/api/accounts');
+      if (response.ok) {
+        const data = await response.json();
+        setAccounts(data.accounts || []);
+      }
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
     }
     setLoading(false);
   };

@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { createAccount } from '@/lib/api/accounts';
 
 interface AddAccountModalProps {
   onAccountAdded?: () => void;
@@ -45,18 +44,22 @@ export default function AddAccountModal({ onAccountAdded }: AddAccountModalProps
     setIsLoading(true);
 
     try {
-      const { data, error } = await createAccount({
-        bank_name: formData.bankName,
-        branch: formData.branch,
-        account_number: formData.accountNumber,
-        ifsc_code: formData.ifscCode,
-        upi_id: formData.upiId,
-        balance: Number(formData.balance),
-        account_type: formData.accountType,
+      const response = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bankName: formData.bankName,
+          branch: formData.branch,
+          accountNumber: formData.accountNumber,
+          ifscCode: formData.ifscCode,
+          upiId: formData.upiId,
+          balance: Number(formData.balance),
+          accountType: formData.accountType,
+        }),
       });
 
-      if (error) {
-        toast.error(error.message);
+      if (!response.ok) {
+        toast.error('Failed to add account');
         return;
       }
 

@@ -1,75 +1,104 @@
-import { supabase } from '@/lib/supabase/client';
-import { Database } from '@/lib/supabase/types';
+import { prisma } from '@/lib/prisma';
 
-type Account = Database['public']['Tables']['accounts']['Row'];
-type AccountInsert = Database['public']['Tables']['accounts']['Insert'];
-type AccountUpdate = Database['public']['Tables']['accounts']['Update'];
-
-export async function getAccounts() {
-  const { data, error } = await supabase
-    .from('accounts')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  return { data, error };
-}
-
-export async function getAccountById(id: string) {
-  const { data, error } = await supabase
-    .from('accounts')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-
-  return { data, error };
-}
-
-export async function createAccount(account: Omit<AccountInsert, 'user_id'>) {
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: new Error('User not authenticated') };
+export async function getAccounts(userId: string) {
+  try {
+    const accounts = await prisma.account.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return { data: accounts, error: null };
+  } catch (error) {
+    return { data: null, error };
   }
-
-  const { data, error } = await supabase
-    .from('accounts')
-    .insert({
-      ...account,
-      user_id: user.id,
-    })
-    .select()
-    .single();
-
-  return { data, error };
 }
 
-export async function updateAccount(id: string, updates: AccountUpdate) {
-  const { data, error } = await supabase
-    .from('accounts')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  return { data, error };
+export async function getAccountById(id: string, userId: string) {
+  try {
+    const account = await prisma.account.findFirst({
+      where: { id, userId },
+    });
+    return { data: account, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
 }
 
-export async function deleteAccount(id: string) {
-  const { error } = await supabase
-    .from('accounts')
-    .delete()
-    .eq('id', id);
-
-  return { error };
+export async function createAccount(
+  userId: string,
+  account: {
+    bankName: string;
+    branch: string;
+    accountNumber: string;
+    ifscCode: string;
+    upiId: string;
+    balance: number;
+    accountType: string;
+  }
+) {
+  try {
+    const newAccount = await prisma.account.create({
+      data: {
+        userId,
+        bankName: account.bankName,
+        branch: account.branch,
+        accountNumber: account.accountNumber,
+        ifscCode: account.ifscCode,
+        upiId: account.upiId,
+        balance: account.balance,
+        accountType: account.accountType,
+      },
+    });
+    return { data: newAccount, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
 }
 
-export async function getTotalBalance() {
-  const { data, error } = await getAccounts();
+export async function updateAccount(
+  id: string,
+  userId: string,
+  updates: {
+    bankName?: string;
+    branch?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+    balance?: number;
+    accountType?: string;
+  }
+) {
+  try {
+    const account = await prisma.account.updateMany({
+      where: { id, userId },
+      data: updates,
+    });
+    return { data: account, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
 
-  if (error || !data) {
+export async function deleteAccount(id: string, userId: string) {
+  try {
+    await prisma.account.deleteMany({
+      where: { id, userId },
+    });
+    return { error: null };
+  } catch (error) {
+    return { error };
+  }
+}
+
+export async function getTotalBalance(userId: string) {
+  try {
+    const result = await prisma.account.aggregate({
+      where: { userId },
+      _sum: {
+        balance: true,
+      },
+    });
+    return { total: Number(result._sum.balance || 0), error: null };
+  } catch (error) {
     return { total: 0, error };
   }
-
-  const total = data.reduce((sum, account) => sum + Number(account.balance), 0);
-  return { total, error: null };
 }

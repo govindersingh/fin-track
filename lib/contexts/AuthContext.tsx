@@ -1,65 +1,54 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase/client';
-import { getProfile } from '@/lib/api/profiles';
-import { Database } from '@/lib/supabase/types';
+import { useSession } from 'next-auth/react';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+interface User {
+  id: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+  plan: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  profile: null,
   loading: true,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        const { data: profileData } = await getProfile();
-        setProfile(profileData);
-      }
-
-      setLoading(false);
-    };
-
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          const { data: profileData } = await getProfile();
-          setProfile(profileData);
-        } else {
-          setProfile(null);
+    const fetchUser = async () => {
+      if (session?.user?.id) {
+        try {
+          const response = await fetch(`/api/users/${session.user.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+          }
+        } catch (error) {
+          console.error('Error fetching user:', error);
         }
+      } else {
+        setUser(null);
       }
-    );
-
-    return () => {
-      subscription.unsubscribe();
     };
-  }, []);
+
+    if (status !== 'loading') {
+      fetchUser();
+    }
+  }, [session, status]);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading }}>
+    <AuthContext.Provider value={{ user, loading: status === 'loading' }}>
       {children}
     </AuthContext.Provider>
   );
