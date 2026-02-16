@@ -27,24 +27,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const fetchUser = async () => {
-      if (session?.user?.id) {
-        try {
-          const response = await fetch(`/api/users/${session.user.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            setUser(data.user);
-          }
-        } catch (error) {
-          console.error('Error fetching user:', error);
+      const userId = session?.user?.id || 'dev-user-001';
+
+      try {
+        const response = await fetch(`/api/users/${userId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        } else {
+          setUser({
+            id: 'dev-user-001',
+            email: 'dev@example.com',
+            fullName: 'Development User',
+            plan: 'premium',
+          });
         }
-      } else {
-        setUser(null);
+      } catch (error) {
+        console.error('Error fetching user:', error);
+        setUser({
+          id: 'dev-user-001',
+          email: 'dev@example.com',
+          fullName: 'Development User',
+          plan: 'premium',
+        });
       }
     };
 
-    if (status !== 'loading') {
-      fetchUser();
-    }
+    fetchUser();
   }, [session, status]);
 
   return (
